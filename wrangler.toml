@@ -1,0 +1,15 @@
+name = "mjr-fcc-management"
+main = "fcc_transactions_worker.js"
+compatibility_date = "2026-10-09"
+
+[triggers]
+# Daily refresh at 06:30 UTC. Adjust after confirming MJR's preferred ET window.
+crons = ["30 6 * * *"]
+
+[[kv_namespaces]]
+binding = "FCC_CACHE"
+id = "REPLACE_WITH_CLOUDFLARE_KV_NAMESPACE_ID"
+
+[vars]
+# Replace with an approved FCC LMS export or MJR-controlled normalized feed.
+FCC_LMS_TRANSACTIONS_URL = "REPLACE_WITH_APPROVED_SOURCE_URL"
