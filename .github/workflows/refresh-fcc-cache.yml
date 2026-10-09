@@ -1,0 +1,42 @@
+name: Refresh MJR FCC Cache
+on:
+  schedule:
+    - cron: '30 6 * * *'
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'scripts/fetch_fcc_lms.mjs'
+      - '.github/workflows/refresh-fcc-cache.yml'
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Download and normalize FCC LMS data
+        run: node scripts/fetch_fcc_lms.mjs
+      - name: Update radio cache
+        uses: cloudflare/wrangler-action@v4
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: kv key put "fcc:transactions:radio" --namespace-id "4c757ac88ca84cf78271cdb8cc7242d1" --path cache-radio.json --remote
+      - name: Update television cache
+        uses: cloudflare/wrangler-action@v4
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: kv key put "fcc:transactions:television" --namespace-id "4c757ac88ca84cf78271cdb8cc7242d1" --path cache-television.json --remote
+      - name: Update all-records cache
+        uses: cloudflare/wrangler-action@v4
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: kv key put "fcc:transactions:all" --namespace-id "4c757ac88ca84cf78271cdb8cc7242d1" --path cache-all.json --remote
