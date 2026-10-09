@@ -1,14 +1,13 @@
 name: Deploy MJR FCC Worker
-
 on:
   push:
     branches: [main]
     paths:
       - 'fcc_transactions_worker.js'
+      - 'package.json'
       - 'wrangler.toml'
       - '.github/workflows/deploy-worker.yml'
   workflow_dispatch:
-
 jobs:
   deploy:
     runs-on: ubuntu-latest
@@ -22,5 +21,3 @@ jobs:
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          vars: |
-            FCC_LMS_TRANSACTIONS_URL=${{ secrets.FCC_LMS_TRANSACTIONS_URL }}
