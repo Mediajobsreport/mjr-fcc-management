@@ -3,7 +3,6 @@ main = "fcc_transactions_worker.js"
 compatibility_date = "2026-10-09"
 
 [triggers]
-# Daily refresh at 06:30 UTC. Adjust after confirming MJR's preferred ET window.
 crons = ["30 6 * * *"]
 
 [[kv_namespaces]]
@@ -11,5 +10,4 @@ binding = "FCC_CACHE"
 id = "4c757ac88ca84cf78271cdb8cc7242d1"
 
 [vars]
-# Replace with an approved FCC LMS export or MJR-controlled normalized feed.
-FCC_LMS_TRANSACTIONS_URL = "REPLACE_WITH_APPROVED_SOURCE_URL"
+FCC_LMS_TRANSACTIONS_URL = "https://enterpriseefiling.fcc.gov/dataentry/api/download/dbfile/Current_LMS_Dump.zip"
