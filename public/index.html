@@ -102,10 +102,15 @@
     <footer class="footer">Rule references checked October 7, 2026 · Sample transactions are historical · Live FCC transaction data refreshes through the MJR management service.</footer>
   </main>
   <script>
-    const transactionPage=new URLSearchParams(location.search).get('page')==='transactions';\n    document.body.classList.toggle('transactions-only',transactionPage);\n    document.querySelectorAll('[data-page-link]').forEach(link=>{if((transactionPage&&link.dataset.pageLink==='transactions')||(!transactionPage&&link.dataset.pageLink==='dashboard'))link.setAttribute('aria-current','page');});\n    if(transactionPage){document.title='FCC Ownership & Transactions | Media Jobs Report';document.querySelector('.page-head h1').textContent='FCC Ownership & Transactions';document.querySelector('.dashboard-intro').textContent='Follow broadcast ownership filings and transactions separately from the station-management dashboard. Filter by service or call sign, then open a row for the FCC file details.';}\n    const tabButtons=[...document.querySelectorAll('[role="tab"]')];
+    const transactionPage=new URLSearchParams(location.search).get('page')==='transactions';
+    document.body.classList.toggle('transactions-only',transactionPage);
+    document.querySelectorAll('[data-page-link]').forEach(link=>{if((transactionPage&&link.dataset.pageLink==='transactions')||(!transactionPage&&link.dataset.pageLink==='dashboard'))link.setAttribute('aria-current','page');});
+    if(transactionPage){document.title='FCC Ownership & Transactions | Media Jobs Report';document.querySelector('.page-head h1').textContent='FCC Ownership & Transactions';document.querySelector('.dashboard-intro').textContent='Follow broadcast ownership filings and transactions separately from the station-management dashboard. Filter by service or call sign, then open a row for the FCC file details.';}
+    const tabButtons=[...document.querySelectorAll('[role="tab"]')];
     function activate(id){tabButtons.forEach(b=>{const selected=b.id===`tab-${id}`;b.setAttribute('aria-selected',selected);document.getElementById(b.getAttribute('aria-controls')).hidden=!selected;});}
     tabButtons.forEach(b=>b.addEventListener('click',()=>activate(b.id.replace('tab-',''))));
-    document.querySelectorAll('[data-tab]').forEach(b=>b.addEventListener('click',()=>activate(b.dataset.tab)));\n    if(transactionPage) activate('transactions'); else {const transactionTab=document.getElementById('tab-transactions'); if(transactionTab) transactionTab.hidden=true; const transactionPanel=document.getElementById('transactions'); if(transactionPanel) transactionPanel.hidden=true;}
+    document.querySelectorAll('[data-tab]').forEach(b=>b.addEventListener('click',()=>activate(b.dataset.tab)));
+    if(transactionPage) activate('transactions'); else {const transactionTab=document.getElementById('tab-transactions'); if(transactionTab) transactionTab.hidden=true; const transactionPanel=document.getElementById('transactions'); if(transactionPanel) transactionPanel.hidden=true;}
 
     const toggle=document.getElementById('profile-toggle'), form=document.getElementById('profile-form');
     toggle.addEventListener('click',()=>document.getElementById('station-profile-section').scrollIntoView({behavior:'smooth',block:'start'}));
