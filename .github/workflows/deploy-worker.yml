@@ -6,7 +6,7 @@ on:
       - 'fcc_transactions_worker.js'
       - 'package.json'
       - 'wrangler.toml'
-      - 'public/index.html'
+      - 'index.html'
       - '.github/workflows/deploy-worker.yml'
   workflow_dispatch:
 jobs:
