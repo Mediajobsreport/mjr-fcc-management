@@ -35,7 +35,7 @@ function createPartyStream(onParty){
     if(!headers){ delimiter=line.includes('|')?'|':(line.includes('\t')?'\t':','); headers=splitLine(line,delimiter).map(x=>x.trim()).filter((x,i,a)=>!(i===a.length-1&&x==='^')); return; }
     const cells=splitLine(line,delimiter); const row=Object.fromEntries(headers.map((h,i)=>[h,String(cells[i]??'').replace(/\^$/,'')]));
     const applicationId=getValue(row,['application id','application_id','aapp application id','apar aapp application id']); const name=partyName(row);
-    if(applicationId&&name) onParty(applicationId,name,partyRole(row));
+    if(applicationId&&name&&(!applicationIds.size||applicationIds.has(applicationId))) onParty(applicationId,name,partyRole(row));
   };
   return { push(bytes,final=false){ buffer+=decoder.decode(bytes,{stream:!final}); const lines=buffer.split(/\r?\n/); buffer=lines.pop()||''; for(const line of lines) consume(line); if(final){ if(buffer.trim()) consume(buffer); buffer=''; } } };
 }
@@ -48,11 +48,11 @@ function createOwnershipStream(onRow){
   };
   return { push(bytes,final=false){ buffer+=decoder.decode(bytes,{stream:!final}); const lines=buffer.split(/\\r?\\n/); buffer=lines.pop()||''; for(const line of lines) consume(line); if(final){ if(buffer.trim()) consume(buffer); buffer=''; } } };
 }
-const applicationRows=[]; const facilityService=new Map(); const facilityIdByApplication=new Map(); const facilityIdService=new Map(); const applicationParties=new Map(); const debug=[]; const wanted=new Set(['application.dat','application_facility.dat','ownership_reports_stations.dat','app_party.dat']);
+const applicationRows=[]; const applicationIds=new Set(); const facilityService=new Map(); const facilityIdByApplication=new Map(); const facilityIdService=new Map(); const applicationParties=new Map(); const debug=[]; const wanted=new Set(['application.dat','application_facility.dat','ownership_reports_stations.dat','app_party.dat']);
 const unzip=new Unzip(file=>{
   const relevant=wanted.has(file.name); debug.push({name:file.name,size:file.originalSize||0});
   if(!relevant) return;
-  const parser=file.name==='ownership_reports_stations.dat' ? createOwnershipStream((facilityId,service)=>facilityIdService.set(facilityId,service)) : file.name==='app_party.dat' ? createPartyStream((applicationId,name,role)=>{ const current=applicationParties.get(applicationId)||{all:[],seller:[],buyer:[]}; if(!current.all.includes(name)) current.all.push(name); const normalizedRole=role.toLowerCase(); if(/assignor|transferor|licensee/.test(normalizedRole)&&!current.seller.includes(name)) current.seller.push(name); if(/assignee|transferee/.test(normalizedRole)&&!current.buyer.includes(name)) current.buyer.push(name); applicationParties.set(applicationId,current); }) : createRowStream(file.name,row=>{ if(file.name==='application_facility.dat'){ if(row.applicationId&&row.facilityId) facilityIdByApplication.set(row.applicationId,row.facilityId); if(row.applicationId&&row.service) facilityService.set(row.applicationId,row.service); } else if(applicationRows.length<500000) applicationRows.push(row); });
+  const parser=file.name==='ownership_reports_stations.dat' ? createOwnershipStream((facilityId,service)=>facilityIdService.set(facilityId,service)) : file.name==='app_party.dat' ? createPartyStream((applicationId,name,role)=>{ const current=applicationParties.get(applicationId)||{all:[],seller:[],buyer:[]}; if(!current.all.includes(name)) current.all.push(name); const normalizedRole=role.toLowerCase(); if(/assignor|transferor|licensee/.test(normalizedRole)&&!current.seller.includes(name)) current.seller.push(name); if(/assignee|transferee/.test(normalizedRole)&&!current.buyer.includes(name)) current.buyer.push(name); applicationParties.set(applicationId,current); }) : createRowStream(file.name,row=>{ if(file.name==='application_facility.dat'){ if(row.applicationId&&row.facilityId) facilityIdByApplication.set(row.applicationId,row.facilityId); if(row.applicationId&&row.service) facilityService.set(row.applicationId,row.service); } else if(applicationRows.length<500000){ applicationRows.push(row); if(row.applicationId) applicationIds.add(row.applicationId); } });
   file.ondata=(err,data,final)=>{ if(err) throw err; parser.push(data,final); };
   file.start();
 });
