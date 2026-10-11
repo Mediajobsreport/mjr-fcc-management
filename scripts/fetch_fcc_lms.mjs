@@ -19,11 +19,20 @@ function createRowStream(file,onRow){
   };
   return { push(bytes,final=false){ buffer+=decoder.decode(bytes,{stream:!final}); const lines=buffer.split(/\r?\n/); buffer=lines.pop()||''; for(const line of lines) consume(line); if(final){ if(buffer.trim()) consume(buffer); buffer=''; } } };
 }
+function createOwnershipStream(onRow){
+  const decoder=new TextDecoder(); let buffer=''; let facilityIndex=-1; let serviceIndex=-1;
+  const consume=line=>{
+    if(!line.trim()) return;
+    if(facilityIndex<0){ const headers=line.split('|').map(x=>x.trim().toLowerCase()); facilityIndex=headers.indexOf('facility_id'); serviceIndex=headers.indexOf('service'); return; }
+    const cells=line.split('|'); const facilityId=String(cells[facilityIndex]??'').trim(); const service=String(cells[serviceIndex]??'').trim(); if(facilityId&&service) onRow(facilityId,service);
+  };
+  return { push(bytes,final=false){ buffer+=decoder.decode(bytes,{stream:!final}); const lines=buffer.split(/\\r?\\n/); buffer=lines.pop()||''; for(const line of lines) consume(line); if(final){ if(buffer.trim()) consume(buffer); buffer=''; } } };
+}
 const applicationRows=[]; const facilityService=new Map(); const facilityIdByApplication=new Map(); const facilityIdService=new Map(); const debug=[]; const wanted=new Set(['application.dat','application_facility.dat','ownership_reports_stations.dat']);
 const unzip=new Unzip(file=>{
   const relevant=wanted.has(file.name); debug.push({name:file.name,size:file.originalSize||0});
   if(!relevant) return;
-  const parser=createRowStream(file.name,row=>{ if(file.name==='ownership_reports_stations.dat'){ if(row.facilityId&&row.service) facilityIdService.set(row.facilityId,row.service); } else if(file.name==='application_facility.dat'){ if(row.applicationId&&row.facilityId) facilityIdByApplication.set(row.applicationId,row.facilityId); if(row.applicationId&&row.service) facilityService.set(row.applicationId,row.service); } else if(applicationRows.length<100000) applicationRows.push(row); });
+  const parser=file.name==='ownership_reports_stations.dat' ? createOwnershipStream((facilityId,service)=>facilityIdService.set(facilityId,service)) : createRowStream(file.name,row=>{ if(file.name==='application_facility.dat'){ if(row.applicationId&&row.facilityId) facilityIdByApplication.set(row.applicationId,row.facilityId); if(row.applicationId&&row.service) facilityService.set(row.applicationId,row.service); } else if(applicationRows.length<100000) applicationRows.push(row); });
   file.ondata=(err,data,final)=>{ if(err) throw err; parser.push(data,final); };
   file.start();
 });
