@@ -1,5 +1,6 @@
 import { Unzip, UnzipInflate } from 'fflate';
-import { createReadStream, writeFile } from 'node:fs';
+import { createReadStream } from 'node:fs';
+import { writeFile } from 'node:fs/promises';
 
 const source = 'https://enterpriseefiling.fcc.gov/dataentry/api/download/dbfile/Current_LMS_Dump.zip';
 const aliases = { applicationId: ['application id','application_id','aapp_application_id','afac_application_id'], call: ['callsign','call sign','station','station callsign','call_sign','app_callsign','aapp_callsign'], city: ['city','community','station city','community of license','afac_community_city'], state: ['state','state code','state abbreviation','afac_community_state_code'], service: ['service','service code','facility type','service type','app service','service_code','afac_facility_type','afac_station_type'], file: ['file number','filenumber','file_num','aapp_file_num','application number','app number','file_no'], type: ['purpose','transaction type','application purpose','form','application type','purpose description','purpose_code','original_purpose_code'], seller: ['assignor','seller','transferor','licensee'], buyer: ['assignee','buyer','transferee','applicant'], status: ['status','application status','status description','current status code','current_status_code','processing_status'], filed: ['date filed','filed date','filing date','received date','aapp_receipt_date','original_filing_date'], statusDate: ['status date','action date','date status','grant date','last action date','status_date'] };
