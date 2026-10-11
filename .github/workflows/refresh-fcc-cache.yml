@@ -20,7 +20,14 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
+      - name: Download FCC LMS archive
+        env:
+          FCC_LMS_URL: https://enterpriseefiling.fcc.gov/dataentry/api/download/dbfile/Current_LMS_Dump.zip
+        run: |
+          curl --fail --location --retry 10 --retry-all-errors --retry-delay 10 --continue-at - --output Current_LMS_Dump.zip "$FCC_LMS_URL"
       - name: Download and normalize FCC LMS data
+        env:
+          FCC_LMS_ZIP: Current_LMS_Dump.zip
         run: node scripts/fetch_fcc_lms.mjs
       - name: Update radio cache
         uses: cloudflare/wrangler-action@v4
