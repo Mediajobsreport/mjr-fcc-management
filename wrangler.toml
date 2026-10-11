@@ -3,7 +3,7 @@ main = "fcc_transactions_worker.js"
 compatibility_date = "2026-10-09"
 
 [assets]
-directory = "."
+directory = "./public"
 
 [triggers]
 crons = ["30 6 * * *"]
