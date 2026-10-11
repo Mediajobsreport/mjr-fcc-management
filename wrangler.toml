@@ -1,7 +1,9 @@
 name = "mjr-fcc-management"
 main = "fcc_transactions_worker.js"
 compatibility_date = "2026-10-09"
-workers_dev = true
+
+[assets]
+directory = "."
 
 [triggers]
 crons = ["30 6 * * *"]
