@@ -32,7 +32,7 @@ const applicationRows=[]; const facilityService=new Map(); const facilityIdByApp
 const unzip=new Unzip(file=>{
   const relevant=wanted.has(file.name); debug.push({name:file.name,size:file.originalSize||0});
   if(!relevant) return;
-  const parser=file.name==='ownership_reports_stations.dat' ? createOwnershipStream((facilityId,service)=>facilityIdService.set(facilityId,service)) : createRowStream(file.name,row=>{ if(file.name==='application_facility.dat'){ if(row.applicationId&&row.facilityId) facilityIdByApplication.set(row.applicationId,row.facilityId); if(row.applicationId&&row.service) facilityService.set(row.applicationId,row.service); } else if(applicationRows.length<100000) applicationRows.push(row); });
+  const parser=file.name==='ownership_reports_stations.dat' ? createOwnershipStream((facilityId,service)=>facilityIdService.set(facilityId,service)) : createRowStream(file.name,row=>{ if(file.name==='application_facility.dat'){ if(row.applicationId&&row.facilityId) facilityIdByApplication.set(row.applicationId,row.facilityId); if(row.applicationId&&row.service) facilityService.set(row.applicationId,row.service); } else if(applicationRows.length<500000) applicationRows.push(row); });
   file.ondata=(err,data,final)=>{ if(err) throw err; parser.push(data,final); };
   file.start();
 });
