@@ -47,7 +47,7 @@ function createOwnershipStream(onRow){
   };
   return { push(bytes,final=false){ buffer+=decoder.decode(bytes,{stream:!final}); const lines=buffer.split(/\\r?\\n/); buffer=lines.pop()||''; for(const line of lines) consume(line); if(final){ if(buffer.trim()) consume(buffer); buffer=''; } } };
 }
-const applicationRows=[]; const applicationIds=new Set(); const facilityService=new Map(); const facilityIdByApplication=new Map(); const facilityIdService=new Map(); const applicationParties=new Map(); const debug=[]; const serviceDiagnostics={applicationFacility:{},ownershipStations:{},normalizedApplications:{}}; const countService=(group,value)=>{const key=String(value??'').trim()||'(blank)';serviceDiagnostics[group][key]=(serviceDiagnostics[group][key]||0)+1;}; const wanted=new Set(['application.dat','application_facility.dat','ownership_reports_stations.dat','app_party.dat']);
+const APPLICATION_ROW_LIMIT=500000; let applicationRowCount=0; const applicationRows=[]; const applicationIds=new Set(); const facilityService=new Map(); const facilityIdByApplication=new Map(); const facilityIdService=new Map(); const applicationParties=new Map(); const debug=[]; const serviceDiagnostics={applicationFacility:{},ownershipStations:{},normalizedApplications:{}}; const countService=(group,value)=>{const key=String(value??'').trim()||'(blank)';serviceDiagnostics[group][key]=(serviceDiagnostics[group][key]||0)+1;}; const wanted=new Set(['application.dat','application_facility.dat','ownership_reports_stations.dat','app_party.dat']);
 const zipPath=process.env.FCC_LMS_ZIP||'Current_LMS_Dump.zip';
 const listed=spawnSync('unzip',['-Z1',zipPath],{encoding:'utf8',maxBuffer:16*1024*1024});
 if(listed.error||listed.status!==0) throw listed.error||new Error('Could not list FCC LMS ZIP entries');
@@ -62,17 +62,37 @@ async function processZipEntry(entry,parser){
   if(code!==0) throw new Error(`Could not extract FCC LMS entry ${entry} (exit ${code})`);
   parser.push(new Uint8Array(0),true);
 }
-const preferredFiles=['application.dat','application_facility.dat','ownership_reports_stations.dat','app_party.dat'];
+const preferredFiles=['application_facility.dat','ownership_reports_stations.dat','application.dat','app_party.dat'];
 for(const fileName of preferredFiles){
   const entry=entryByName.get(fileName);
   if(!entry){debug.push({name:fileName,size:null,missing:true});continue;}
   debug.push({name:fileName,size:null});
-  const parser=fileName==='ownership_reports_stations.dat' ? createOwnershipStream((facilityId,service)=>{facilityIdService.set(facilityId,service);countService('ownershipStations',service);}) : fileName==='app_party.dat' ? createPartyStream((applicationId,name,role)=>{ const current=applicationParties.get(applicationId)||{all:[],seller:[],buyer:[]}; if(!current.all.includes(name)) current.all.push(name); const normalizedRole=role.toLowerCase(); if(/assignor|transferor|licensee/.test(normalizedRole)&&!current.seller.includes(name)) current.seller.push(name); if(/assignee|transferee/.test(normalizedRole)&&!current.buyer.includes(name)) current.buyer.push(name); applicationParties.set(applicationId,current); }) : createRowStream(fileName,row=>{ if(fileName==='application_facility.dat'){ countService('applicationFacility',row.service); if(row.applicationId&&row.facilityId) facilityIdByApplication.set(row.applicationId,row.facilityId); if(row.applicationId&&row.service) facilityService.set(row.applicationId,row.service); } else if(applicationRows.length<500000){ applicationRows.push(row); if(row.applicationId) applicationIds.add(row.applicationId); } });
+  const parser=fileName==='ownership_reports_stations.dat' ? createOwnershipStream((facilityId,service)=>{facilityIdService.set(facilityId,service);countService('ownershipStations',service);}) : fileName==='app_party.dat' ? createPartyStream((applicationId,name,role)=>{ const current=applicationParties.get(applicationId)||{all:[],seller:[],buyer:[]}; if(!current.all.includes(name)) current.all.push(name); const normalizedRole=role.toLowerCase(); if(/assignor|transferor|licensee/.test(normalizedRole)&&!current.seller.includes(name)) current.seller.push(name); if(/assignee|transferee/.test(normalizedRole)&&!current.buyer.includes(name)) current.buyer.push(name); applicationParties.set(applicationId,current); }) : createRowStream(fileName,row=>{ if(fileName==='application_facility.dat'){ countService('applicationFacility',row.service); if(row.applicationId&&row.facilityId) facilityIdByApplication.set(row.applicationId,row.facilityId); if(row.applicationId&&row.service) facilityService.set(row.applicationId,row.service); } else if(fileName==='application.dat'){ applicationRows[applicationRowCount % APPLICATION_ROW_LIMIT]=row; applicationRowCount++; } });
   await processZipEntry(entry,parser);
 }
+for(const row of applicationRows) if(row?.applicationId) applicationIds.add(row.applicationId);
 const all=[]; const seen=new Set();
 for(const row of applicationRows){ row.service=row.service||facilityService.get(row.applicationId)||facilityIdService.get(facilityIdByApplication.get(row.applicationId))||''; countService('normalizedApplications',row.service); row.file=row.file||row.applicationId; if(!row.isTransaction) continue; const parties=applicationParties.get(row.applicationId)||{all:[],seller:[],buyer:[]}; row.seller=row.seller||parties.seller.join(' · '); row.buyer=row.buyer||parties.buyer.join(' · '); row.parties=parties.all.join(' · '); const identity=(row.applicationId||'')+'|'+row.file+'|'+row.call+'|'+row.type; if(seen.has(identity)) continue; seen.add(identity); all.push(row); }
 function dateScore(value){const text=String(value??'').trim();if(!text||/1900/.test(text))return 0;const time=Date.parse(text);return Number.isNaN(time)?0:time;}
 all.sort((a,b)=>{const aDate=dateScore(a.filed)||dateScore(a.statusDate);const bDate=dateScore(b.filed)||dateScore(b.statusDate);return bDate-aDate;});
-const fetched_at=new Date().toISOString(); const publicRecord=({source_file,isTransaction,...record})=>record; for(const service of ['all','radio','television']){ const data=all.filter(row=>serviceMatches(row,service)); const output=service==='all'?data.slice(0,100000):data; await writeFile('cache-'+service+'.json',JSON.stringify({data:output.map(publicRecord),connected:true,service,source:'FCC LMS Current_LMS_Dump.zip',fetched_at,review_count:output.filter(row=>row.review).length})); }
-const topServices=group=>Object.entries(serviceDiagnostics[group]).sort((a,b)=>b[1]-a[1]).slice(0,30); await writeFile('cache-debug.json',JSON.stringify({fetched_at,files:debug,party_application_count:applicationParties.size,service_diagnostics:Object.fromEntries(Object.keys(serviceDiagnostics).map(group=>[group,topServices(group)]))})); console.log(JSON.stringify({fetched_at,records:all.length,radio:all.filter(r=>serviceMatches(r,'radio')).length,television:all.filter(r=>serviceMatches(r,'television')).length,party_application_count:applicationParties.size,service_diagnostics:Object.fromEntries(Object.keys(serviceDiagnostics).map(group=>[group,topServices(group)]))}));
+const fetched_at=new Date().toISOString();
+const CACHE_MAX_BYTES=23*1024*1024;
+const publicRecord=({source_file,isTransaction,...record})=>record;
+for(const service of ['all','radio','television']){
+  const rows=all.filter(row=>serviceMatches(row,service));
+  const output=[];
+  let dataBytes=2;
+  for(const row of rows){
+    const record=publicRecord(row);
+    const encoded=JSON.stringify(record);
+    const nextBytes=Buffer.byteLength(encoded)+(output.length?1:0);
+    if(dataBytes+nextBytes>CACHE_MAX_BYTES) break;
+    output.push(record);
+    dataBytes+=nextBytes;
+  }
+  const payload={data:output,connected:true,service,source:'FCC LMS Current_LMS_Dump.zip',fetched_at,review_count:output.filter(row=>row.review).length};
+  const json=JSON.stringify(payload);
+  if(Buffer.byteLength(json)>=24*1024*1024) throw new Error(`Cache ${service} exceeds a safe Cloudflare KV size limit`);
+  await writeFile('cache-'+service+'.json',json);
+}
+const topServices=group=>Object.entries(serviceDiagnostics[group]).sort((a,b)=>b[1]-a[1]).slice(0,30); await writeFile('cache-debug.json',JSON.stringify({fetched_at,files:debug,party_application_count:applicationParties.size,service_diagnostics:Object.fromEntries(Object.keys(serviceDiagnostics).map(group=>[group,topServices(group)]))})); console.log(JSON.stringify({fetched_at,application_rows_seen:applicationRowCount,application_rows_retained:applicationRows.length,records:all.length,radio:all.filter(r=>serviceMatches(r,'radio')).length,television:all.filter(r=>serviceMatches(r,'television')).length,party_application_count:applicationParties.size,service_diagnostics:Object.fromEntries(Object.keys(serviceDiagnostics).map(group=>[group,topServices(group)]))}));
