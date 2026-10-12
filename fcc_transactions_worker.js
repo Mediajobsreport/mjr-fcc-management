@@ -88,7 +88,7 @@ function parseStationCards(html) {
     const title = textOnly(card.match(/<h3[^>]*>([\s\S]*?)<\/h3>/i)?.[1] || '');
     const location = textOnly(card.match(/class=["'][^"']*mjr-station-location[^"']*["'][^>]*>([\s\S]*?)<\/[^>]+>/i)?.[1] || '');
     const service = textOnly(card.match(/class=["'][^"']*mjr-station-badge[^"']*["'][^>]*>([\s\S]*?)<\/[^>]+>/i)?.[1] || '');
-    const fccLink = card.match(/href=["'](https?:\\/\\/publicfiles\\.fcc\\.gov\\/[^"']+)["']/i)?.[1] || '';
+    const fccLink = card.match(/href=["'](https?:\/\/publicfiles\.fcc\.gov\/[^"']+)["']/i)?.[1] || '';
     return {
       call: title,
       location,
