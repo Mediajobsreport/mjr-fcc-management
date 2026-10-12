@@ -1,5 +1,4 @@
-import { Unzip, UnzipInflate } from 'fflate';
-import { createReadStream } from 'node:fs';
+import { spawn, spawnSync } from 'node:child_process';
 import { writeFile } from 'node:fs/promises';
 
 const source = 'https://enterpriseefiling.fcc.gov/dataentry/api/download/dbfile/Current_LMS_Dump.zip';
@@ -49,17 +48,28 @@ function createOwnershipStream(onRow){
   return { push(bytes,final=false){ buffer+=decoder.decode(bytes,{stream:!final}); const lines=buffer.split(/\\r?\\n/); buffer=lines.pop()||''; for(const line of lines) consume(line); if(final){ if(buffer.trim()) consume(buffer); buffer=''; } } };
 }
 const applicationRows=[]; const applicationIds=new Set(); const facilityService=new Map(); const facilityIdByApplication=new Map(); const facilityIdService=new Map(); const applicationParties=new Map(); const debug=[]; const serviceDiagnostics={applicationFacility:{},ownershipStations:{},normalizedApplications:{}}; const countService=(group,value)=>{const key=String(value??'').trim()||'(blank)';serviceDiagnostics[group][key]=(serviceDiagnostics[group][key]||0)+1;}; const wanted=new Set(['application.dat','application_facility.dat','ownership_reports_stations.dat','app_party.dat']);
-const unzip=new Unzip(file=>{
-  const relevant=wanted.has(file.name); debug.push({name:file.name,size:file.originalSize||0});
-  if(!relevant) return;
-  const parser=file.name==='ownership_reports_stations.dat' ? createOwnershipStream((facilityId,service)=>{facilityIdService.set(facilityId,service);countService('ownershipStations',service);}) : file.name==='app_party.dat' ? createPartyStream((applicationId,name,role)=>{ const current=applicationParties.get(applicationId)||{all:[],seller:[],buyer:[]}; if(!current.all.includes(name)) current.all.push(name); const normalizedRole=role.toLowerCase(); if(/assignor|transferor|licensee/.test(normalizedRole)&&!current.seller.includes(name)) current.seller.push(name); if(/assignee|transferee/.test(normalizedRole)&&!current.buyer.includes(name)) current.buyer.push(name); applicationParties.set(applicationId,current); }) : createRowStream(file.name,row=>{ if(file.name==='application_facility.dat'){ countService('applicationFacility',row.service); if(row.applicationId&&row.facilityId) facilityIdByApplication.set(row.applicationId,row.facilityId); if(row.applicationId&&row.service) facilityService.set(row.applicationId,row.service); } else if(applicationRows.length<500000){ applicationRows.push(row); if(row.applicationId) applicationIds.add(row.applicationId); } });
-  file.ondata=(err,data,final)=>{ if(err) throw err; parser.push(data,final); };
-  file.start();
-});
-unzip.register(UnzipInflate);
-const reader=createReadStream(process.env.FCC_LMS_ZIP||'Current_LMS_Dump.zip',{highWaterMark:1024*1024});
-for await (const chunk of reader) unzip.push(new Uint8Array(chunk));
-unzip.push(new Uint8Array(0),true);
+const zipPath=process.env.FCC_LMS_ZIP||'Current_LMS_Dump.zip';
+const listed=spawnSync('unzip',['-Z1',zipPath],{encoding:'utf8',maxBuffer:16*1024*1024});
+if(listed.error||listed.status!==0) throw listed.error||new Error('Could not list FCC LMS ZIP entries');
+const archiveEntries=listed.stdout.split(/\r?\n/).filter(Boolean);
+const entryByName=new Map(archiveEntries.map(entry=>[entry.split('/').pop(),entry]));
+async function processZipEntry(entry,parser){
+  const child=spawn('unzip',['-p',zipPath,entry],{stdio:['ignore','pipe','inherit']});
+  const exitPromise=new Promise((resolve,reject)=>{child.once('error',reject);child.once('close',resolve);});
+  const readPromise=(async()=>{for await(const chunk of child.stdout) parser.push(new Uint8Array(chunk));})();
+  const code=await exitPromise;
+  await readPromise;
+  if(code!==0) throw new Error(`Could not extract FCC LMS entry ${entry} (exit ${code})`);
+  parser.push(new Uint8Array(0),true);
+}
+const preferredFiles=['application.dat','application_facility.dat','ownership_reports_stations.dat','app_party.dat'];
+for(const fileName of preferredFiles){
+  const entry=entryByName.get(fileName);
+  if(!entry){debug.push({name:fileName,size:null,missing:true});continue;}
+  debug.push({name:fileName,size:null});
+  const parser=fileName==='ownership_reports_stations.dat' ? createOwnershipStream((facilityId,service)=>{facilityIdService.set(facilityId,service);countService('ownershipStations',service);}) : fileName==='app_party.dat' ? createPartyStream((applicationId,name,role)=>{ const current=applicationParties.get(applicationId)||{all:[],seller:[],buyer:[]}; if(!current.all.includes(name)) current.all.push(name); const normalizedRole=role.toLowerCase(); if(/assignor|transferor|licensee/.test(normalizedRole)&&!current.seller.includes(name)) current.seller.push(name); if(/assignee|transferee/.test(normalizedRole)&&!current.buyer.includes(name)) current.buyer.push(name); applicationParties.set(applicationId,current); }) : createRowStream(fileName,row=>{ if(fileName==='application_facility.dat'){ countService('applicationFacility',row.service); if(row.applicationId&&row.facilityId) facilityIdByApplication.set(row.applicationId,row.facilityId); if(row.applicationId&&row.service) facilityService.set(row.applicationId,row.service); } else if(applicationRows.length<500000){ applicationRows.push(row); if(row.applicationId) applicationIds.add(row.applicationId); } });
+  await processZipEntry(entry,parser);
+}
 const all=[]; const seen=new Set();
 for(const row of applicationRows){ row.service=row.service||facilityService.get(row.applicationId)||facilityIdService.get(facilityIdByApplication.get(row.applicationId))||''; countService('normalizedApplications',row.service); row.file=row.file||row.applicationId; if(!row.isTransaction) continue; const parties=applicationParties.get(row.applicationId)||{all:[],seller:[],buyer:[]}; row.seller=row.seller||parties.seller.join(' · '); row.buyer=row.buyer||parties.buyer.join(' · '); row.parties=parties.all.join(' · '); const identity=(row.applicationId||'')+'|'+row.file+'|'+row.call+'|'+row.type; if(seen.has(identity)) continue; seen.add(identity); all.push(row); }
 function dateScore(value){const text=String(value??'').trim();if(!text||/1900/.test(text))return 0;const time=Date.parse(text);return Number.isNaN(time)?0:time;}
