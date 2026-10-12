@@ -45,7 +45,7 @@ function createOwnershipStream(onRow){
     if(facilityIndex<0){ const headers=line.split('|').map(x=>x.trim().toLowerCase()); facilityIndex=headers.indexOf('facility_id'); serviceIndex=headers.indexOf('service'); return; }
     const cells=line.split('|'); const facilityId=String(cells[facilityIndex]??'').trim(); const service=String(cells[serviceIndex]??'').trim(); if(facilityId&&service) onRow(facilityId,service);
   };
-  return { push(bytes,final=false){ buffer+=decoder.decode(bytes,{stream:!final}); const lines=buffer.split(/\\r?\\n/); buffer=lines.pop()||''; for(const line of lines) consume(line); if(final){ if(buffer.trim()) consume(buffer); buffer=''; } } };
+  return { push(bytes,final=false){ buffer+=decoder.decode(bytes,{stream:!final}); const lines=buffer.split(/\r?\n/); buffer=lines.pop()||''; for(const line of lines) consume(line); if(final){ if(buffer.trim()) consume(buffer); buffer=''; } } };
 }
 const APPLICATION_ROW_LIMIT=500000; let applicationRowCount=0; const applicationRows=[]; const applicationIds=new Set(); const facilityService=new Map(); const facilityIdByApplication=new Map(); const facilityIdService=new Map(); const applicationParties=new Map(); const debug=[]; const serviceDiagnostics={applicationFacility:{},ownershipStations:{},normalizedApplications:{}}; const countService=(group,value)=>{const key=String(value??'').trim()||'(blank)';serviceDiagnostics[group][key]=(serviceDiagnostics[group][key]||0)+1;}; const wanted=new Set(['application.dat','application_facility.dat','ownership_reports_stations.dat','app_party.dat']);
 const zipPath=process.env.FCC_LMS_ZIP||'Current_LMS_Dump.zip';
