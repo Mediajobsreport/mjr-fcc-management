@@ -16,8 +16,13 @@ function recentRows(rows) {
   return rows.filter(row => Math.max(dateScore(row.filed), dateScore(row.statusDate)) >= cutoffTime);
 }
 
-function callMatches(row, call) {
-  return !call || String(row.call || '').toLowerCase().includes(call);
+function transactionMatches(row, query) {
+  if (!query) return true;
+  const searchable = [
+    row.call, row.seller, row.buyer, row.parties, row.licensee,
+    row.applicant, row.assignee, row.assignor, row.file
+  ];
+  return searchable.some(value => String(value ?? '').toLowerCase().includes(query));
 }
 
 function looksLikeRadio(row) {
@@ -32,13 +37,13 @@ async function readCache(env, service) {
   return env.FCC_CACHE.get(`${CACHE_PREFIX}${service}`, 'json');
 }
 
-async function buildResponse(env, service, call) {
+async function buildResponse(env, service, query) {
   let cached = await readCache(env, service);
   if (!cached || !Array.isArray(cached.data)) return null;
 
   let data = cached.data;
-  if (call) {
-    data = data.filter(row => callMatches(row, call));
+  if (query) {
+    data = data.filter(row => transactionMatches(row, query));
   } else {
     data = recentRows(data);
   }
@@ -47,22 +52,22 @@ async function buildResponse(env, service, call) {
     ...cached,
     data,
     service,
-    result_scope: call ? 'full cached FCC download for call-sign search' : 'FCC filings dated within the last two years'
+    result_scope: query ? 'full cached FCC download for call-sign or party-name search' : 'FCC filings dated within the last two years'
   };
 }
 
-async function radioFallback(env, call) {
+async function radioFallback(env, query) {
   const cached = await readCache(env, 'all');
   if (!cached || !Array.isArray(cached.data)) return null;
   let data = cached.data.filter(looksLikeRadio);
-  data = call ? data.filter(row => callMatches(row, call)) : recentRows(data);
+  data = query ? data.filter(row => transactionMatches(row, query)) : recentRows(data);
   return {
     ...cached,
     data,
     service: 'radio',
     fallback: true,
     fallback_note: 'Derived from the combined FCC cache while service metadata is normalized.',
-    result_scope: call ? 'full cached FCC download for call-sign search' : 'FCC filings dated within the last two years'
+    result_scope: query ? 'full cached FCC download for call-sign or party-name search' : 'FCC filings dated within the last two years'
   };
 }
 
@@ -177,7 +182,7 @@ export default {
 
     const requested = url.searchParams.get('service');
     const service = ['radio', 'television', 'all', 'debug'].includes(requested) ? requested : 'radio';
-    const call = String(url.searchParams.get('call') || '').trim().toLowerCase();
+    const query = String(url.searchParams.get('search') || url.searchParams.get('call') || '').trim().toLowerCase();
 
     if (service === 'debug') {
       const debug = await readCache(env, 'debug');
@@ -186,10 +191,10 @@ export default {
         : Response.json({ connected: false, service: 'debug' }, { status: 503, headers: JSON_HEADERS });
     }
 
-    if (service === 'all' && call) {
+    if (service === 'all' && query) {
       const [radio, television] = await Promise.all([
-        buildResponse(env, 'radio', call),
-        buildResponse(env, 'television', call)
+        buildResponse(env, 'radio', query),
+        buildResponse(env, 'television', query)
       ]);
       const sources = [radio, television].filter(Boolean);
       if (sources.length) {
@@ -198,16 +203,16 @@ export default {
           connected: true,
           service: 'all',
           data,
-          result_scope: 'full cached FCC download for call-sign search'
+          result_scope: 'full cached FCC download for call-sign or party-name search'
         }, { headers: JSON_HEADERS });
       }
     }
 
-    const result = await buildResponse(env, service, call);
+    const result = await buildResponse(env, service, query);
     if (result) return Response.json(result, { headers: JSON_HEADERS });
 
     if (service === 'radio') {
-      const fallback = await radioFallback(env, call);
+      const fallback = await radioFallback(env, query);
       if (fallback) return Response.json(fallback, { headers: JSON_HEADERS });
     }
 
