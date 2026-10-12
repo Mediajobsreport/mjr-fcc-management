@@ -105,6 +105,24 @@ function parseStationCards(html) {
   }).filter(row => row.call);
 }
 
+function calendarText(events) {
+  const escape = value => String(value ?? '').replace(/\\/g, '\\\\').replace(/;/g, '\\;').replace(/,/g, '\\,').replace(/\\r?\\n/g, '\\n');
+  const lines = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//Media Jobs Report//FCC Management Dashboard//EN'];
+  for (const event of Array.isArray(events) ? events.slice(0, 20) : []) {
+    if (!event?.title || !event?.date) continue;
+    lines.push(
+      'BEGIN:VEVENT',
+      `UID:${String(event.title).replace(/[^a-z0-9]/gi, '')}-${event.date}@mediajobsreport.com`,
+      `DTSTART;VALUE=DATE:${String(event.date).replaceAll('-', '')}`,
+      `SUMMARY:${escape(event.title)}`,
+      `DESCRIPTION:${escape(event.note || 'Verify with the FCC before acting.')}`,
+      'END:VEVENT'
+    );
+  }
+  lines.push('END:VCALENDAR');
+  return lines.join('\\r\\n');
+}
+
 async function stationResponse(call) {
   const query = new URLSearchParams({
     mjr_station_search: '1',
@@ -133,6 +151,20 @@ export default {
     }
     if (!url.pathname.startsWith('/api/')) return env.ASSETS.fetch(request);
     if (request.method !== 'GET') return new Response('Method not allowed', { status: 405 });
+
+    if (url.pathname === '/api/fcc/calendar') {
+      let events = [];
+      try { events = JSON.parse(url.searchParams.get('events') || '[]'); } catch {}
+      const body = calendarText(events);
+      return new Response(body, {
+        headers: {
+          'Content-Type': 'text/calendar; charset=utf-8',
+          'Content-Disposition': 'attachment; filename="mjr-fcc-management-reminders.ics"',
+          'Cache-Control': 'no-store',
+          'Access-Control-Allow-Origin': '*'
+        }
+      });
+    }
 
     if (url.pathname === '/api/fcc/station') {
       const call = String(url.searchParams.get('call') || '').trim();
