@@ -26,8 +26,6 @@
 <body>
   <main class="shell">
     <header class="page-head"><div class="brand-logo-wrap"><svg class="brand-logo" viewBox="0 0 450 70" role="img" aria-label="Media Jobs Report"><circle cx="27" cy="18" r="14" fill="none" stroke="#fff" stroke-width="5"/><path d="M38 29l13 12" fill="none" stroke="#fff" stroke-width="5" stroke-linecap="round"/><path d="M7 47c5-10 13-15 23-15s18 5 23 15v18H7z" fill="#fff"/><path d="M20 39l10 9 10-9-3 26H23z" fill="#192a56"/><path d="M30 48l-4 5 4 10 4-10z" fill="#fff"/><text x="66" y="36" fill="#fff" font-family="Georgia,serif" font-size="53" font-weight="700">Media Jobs</text><text x="183" y="64" fill="#fff" font-family="Georgia,serif" font-size="19" font-weight="700" letter-spacing="8">REPORT</text></svg></div><div><h1>FCC Management Dashboard</h1></div><div aria-hidden="true"></div></header>
-    <p class="dashboard-intro">A station-management workspace for FCC deadlines, public-file, EEO, EAS, and recurring compliance responsibilities.</p>
-    <aside class="disclaimer dashboard-disclaimer"><strong>Important:</strong> Dates and requirements are a planning guide, not a compliance determination. Confirm current deadlines, filing instructions, and station applicability with the <a href="https://www.fcc.gov/edocs/daily-digest" target="_blank" rel="noreferrer">FCC</a> before acting.</aside>
     <section class="station-profile-panel" id="station-profile-section" aria-labelledby="station-profile-heading">
       <div class="section-head blue-header"><div><h2 id="station-profile-heading">Station profile</h2><p>Enter these details first so the dashboard has the right station context.</p></div><span class="pill gray">Not saved</span></div>
       <div class="profile" id="profile-form"><div class="eyebrow">Station details used for personalized reminders and applicability review</div><div class="fields"><label>Station call sign<input id="call-sign" placeholder="Example: WXYZ"></label><label>Service<select id="service"><option value="">Choose service</option><option>AM</option><option>FM</option><option>TV / Class A</option><option>Other</option></select></label><label>License type<select id="license"><option value="">Choose status</option><option>Commercial</option><option>Noncommercial</option></select></label><label>State<input id="state" placeholder="State of license"></label><label>Renewal due date<input id="renewal" type="date"></label><label>Full-time employees<input id="employees" type="number" min="0" placeholder="Employment unit"></label><label>Shared employees in same market<select id="shared"><option value="">Choose one</option><option>Yes</option><option>No</option></select></label></div><div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:12px"><button class="save-button" id="save-profile" type="button">Save station profile</button><button class="link-button" id="clear-profile" type="button">Clear profile</button></div><p class="form-note">Saved in this browser only. Nothing is sent to the FCC. Calculated reminders remain planning aids and should be verified before action.</p></div>
@@ -70,11 +68,6 @@
       <p class="footer">This checklist is a navigation aid, not a station's completed compliance file. Official rules and station-specific FCC notices control.</p>
     </section>
 
-    <section class="dashboard-transactions-link" aria-labelledby="dashboard-transactions-heading">
-      <div class="section-head blue-header"><div><h2 id="dashboard-transactions-heading">Ownership &amp; transactions</h2><p>Search current and historical FCC filings separately from the station dashboard.</p></div></div>
-      <article class="card"><p>Use the separate FCC Ownership &amp; Transactions report to search by service or call sign.</p><a class="save-button" href="/fcc-ownership-transactions">Open Ownership &amp; Transactions</a></article>
-    </section>
-
     <section class="panel" id="transactions" role="tabpanel" aria-labelledby="tab-transactions" hidden>
       <div class="section-head blue-header" style="margin-top:0"><div><h2>Ownership &amp; transactions</h2></div></div>
       <article class="card"><div class="eyebrow">Live FCC transaction search</div><div class="live-filter"><label>Station call sign<input id="station-filter" placeholder="Optional, e.g. WXYZ" autocomplete="off"></label><label>Service<select id="view-service" aria-label="Transaction service"><option value="radio">Radio</option><option value="television">Television</option><option value="all">Radio and television</option></select></label><span class="live-auto-note">Newest two years · call-sign search includes historical cache</span></div><div id="import-message" class="form-note" role="status"></div><div id="imported-transactions"></div>
@@ -82,13 +75,14 @@
       <aside class="disclaimer transaction-disclaimer"><strong>Important:</strong> Dates and requirements are a planning guide, not a compliance determination. Confirm current deadlines, filing instructions, and station applicability with the <a href="https://www.fcc.gov/edocs/daily-digest" target="_blank" rel="noreferrer"><strong>FCC</strong></a> before acting. The initial display shows filings dated within the past two years. Enter a call sign to search the full cached FCC download.</aside>
     </section>
 
+    <aside class="disclaimer dashboard-disclaimer"><strong>Important:</strong> Dates and requirements are a planning guide, not a compliance determination. Confirm current deadlines, filing instructions, and station applicability with the <a href="https://www.fcc.gov/edocs/daily-digest" target="_blank" rel="noreferrer">FCC</a> before acting.</aside>
     <footer class="footer">Rule references checked October 7, 2026 · Verify all station-specific requirements with the FCC.</footer>
   </main>
   <script>
     const transactionPage=new URLSearchParams(location.search).get('page')==='transactions';
     document.body.classList.toggle('transactions-only',transactionPage);
     document.querySelectorAll('[data-page-link]').forEach(link=>{if((transactionPage&&link.dataset.pageLink==='transactions')||(!transactionPage&&link.dataset.pageLink==='dashboard'))link.setAttribute('aria-current','page');});
-    if(transactionPage){document.title='FCC Ownership & Transactions | Media Jobs Report';document.querySelector('.page-head h1').textContent='FCC Ownership & Transactions';document.querySelector('.dashboard-intro').textContent='';}
+    if(transactionPage){document.title='FCC Ownership & Transactions | Media Jobs Report';document.querySelector('.page-head h1').textContent='FCC Ownership & Transactions';}
     const tabButtons=[...document.querySelectorAll('[role="tab"]')];
     function activate(id){tabButtons.forEach(b=>{const selected=b.id===`tab-${id}`;b.setAttribute('aria-selected',selected);document.getElementById(b.getAttribute('aria-controls')).hidden=!selected;});}
     tabButtons.forEach(b=>b.addEventListener('click',()=>activate(b.id.replace('tab-',''))));
