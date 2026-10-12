@@ -87,7 +87,7 @@
     if(transactionPage) activate('transactions'); else {const transactionTab=document.getElementById('tab-transactions'); if(transactionTab) transactionTab.hidden=true; const transactionPanel=document.getElementById('transactions'); if(transactionPanel) transactionPanel.hidden=true;}
 
     const toggle=document.getElementById('profile-toggle'), form=document.getElementById('profile-form');
-    toggle.addEventListener('click',()=>document.getElementById('station-profile-section').scrollIntoView({behavior:'smooth',block:'start'}));
+    if(toggle)toggle.addEventListener('click',()=>document.getElementById('station-profile-section').scrollIntoView({behavior:'smooth',block:'start'}));
     const ids=['call-sign','service','license','state','renewal','employees','shared'];
     const field=id=>document.getElementById(id);
     const profileBanner=document.getElementById('profile-banner');
