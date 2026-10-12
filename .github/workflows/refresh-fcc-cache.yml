@@ -37,20 +37,46 @@ jobs:
         env:
           FCC_LMS_ZIP: Current_LMS_Dump.zip
         run: node scripts/fetch_fcc_lms.mjs
+      - name: Validate cache outputs
+        id: cache-check
+        run: |
+          node <<'NODE'
+          const fs = require('node:fs');
+          const cutoff = new Date();
+          cutoff.setFullYear(cutoff.getFullYear() - 2);
+          const outputs = [];
+          for (const service of ['radio', 'television']) {
+            const payload = JSON.parse(fs.readFileSync(`cache-${service}.json`, 'utf8'));
+            const rows = Array.isArray(payload.data) ? payload.data : [];
+            const dates = rows.flatMap(row => [row.filed, row.statusDate].map(value => Date.parse(value || ''))).filter(Number.isFinite);
+            const latest = dates.length ? Math.max(...dates) : 0;
+            const valid = rows.length > 0 && latest >= cutoff.getTime();
+            console.log(`${service}: ${rows.length} rows; latest ${latest ? new Date(latest).toISOString() : 'none'}; upload ${valid ? 'enabled' : 'skipped to preserve existing cache'}`);
+            outputs.push(`${service}_valid=${valid}`);
+          }
+          const allBytes = fs.statSync('cache-all.json').size;
+          const allValid = allBytes < 24 * 1024 * 1024;
+          console.log(`all cache: ${allBytes} bytes; upload ${allValid ? 'enabled' : 'skipped to stay below Cloudflare KV limit'}`);
+          outputs.push(`all_valid=${allValid}`);
+          fs.appendFileSync(process.env.GITHUB_OUTPUT, outputs.join('\n') + '\n');
+          NODE
       - name: Update radio cache
         uses: cloudflare/wrangler-action@v4
+        if: steps.cache-check.outputs.radio_valid == 'true'
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           command: kv key put "fcc:transactions:radio" --namespace-id "4c757ac88ca84cf78271cdb8cc7242d1" --path cache-radio.json --remote
       - name: Update television cache
         uses: cloudflare/wrangler-action@v4
+        if: steps.cache-check.outputs.television_valid == 'true'
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           command: kv key put "fcc:transactions:television" --namespace-id "4c757ac88ca84cf78271cdb8cc7242d1" --path cache-television.json --remote
       - name: Update all-records cache
         uses: cloudflare/wrangler-action@v4
+        if: steps.cache-check.outputs.all_valid == 'true'
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
