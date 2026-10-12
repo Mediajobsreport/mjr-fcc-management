@@ -24,7 +24,20 @@ jobs:
         env:
           FCC_LMS_URL: https://enterpriseefiling.fcc.gov/dataentry/api/download/dbfile/Current_LMS_Dump.zip
         run: |
-          curl --fail --location --retry 10 --retry-all-errors --retry-delay 10 --continue-at - --output Current_LMS_Dump.zip "$FCC_LMS_URL"
+          verified=0
+          for attempt in 1 2; do
+            rm -f Current_LMS_Dump.zip
+            echo "Downloading FCC LMS archive (attempt $attempt of 2)"
+            if curl --fail --location --retry 10 --retry-all-errors --retry-delay 10 --output Current_LMS_Dump.zip "$FCC_LMS_URL" && unzip -tq Current_LMS_Dump.zip; then
+              verified=1
+              break
+            fi
+            echo "FCC archive failed its ZIP integrity check; retrying with a fresh download."
+          done
+          if [ "$verified" -ne 1 ]; then
+            echo "FCC LMS archive failed ZIP integrity checks after two downloads." >&2
+            exit 1
+          fi
       - name: Download and normalize FCC LMS data
         env:
           FCC_LMS_ZIP: Current_LMS_Dump.zip
