@@ -74,7 +74,7 @@ function decodeHtml(value) {
 }
 
 function textOnly(value) {
-  return decodeHtml(String(value ?? '').replace(/<[^>]*>/g, ' ').replace(/\\s+/g, ' ').trim());
+  return decodeHtml(String(value ?? '').replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim());
 }
 
 function stationField(card, label) {
@@ -83,11 +83,11 @@ function stationField(card, label) {
 }
 
 function parseStationCards(html) {
-  const cards = [...String(html).matchAll(/<article[^>]*class=["'][^"']*mjr-station-card[^"']*["'][^>]*>([\\s\\S]*?)<\\/article>/gi)].map(match => match[1]);
+  const cards = [...String(html).matchAll(/<article[^>]*class=["'][^"']*mjr-station-card[^"']*["'][^>]*>([\s\S]*?)<\/article>/gi)].map(match => match[1]);
   return cards.map(card => {
-    const title = textOnly(card.match(/<h3[^>]*>([\\s\\S]*?)<\\/h3>/i)?.[1] || '');
-    const location = textOnly(card.match(/class=["'][^"']*mjr-station-location[^"']*["'][^>]*>([\\s\\S]*?)<\\/[^>]+>/i)?.[1] || '');
-    const service = textOnly(card.match(/class=["'][^"']*mjr-station-badge[^"']*["'][^>]*>([\\s\\S]*?)<\\/[^>]+>/i)?.[1] || '');
+    const title = textOnly(card.match(/<h3[^>]*>([\s\S]*?)<\/h3>/i)?.[1] || '');
+    const location = textOnly(card.match(/class=["'][^"']*mjr-station-location[^"']*["'][^>]*>([\s\S]*?)<\/[^>]+>/i)?.[1] || '');
+    const service = textOnly(card.match(/class=["'][^"']*mjr-station-badge[^"']*["'][^>]*>([\s\S]*?)<\/[^>]+>/i)?.[1] || '');
     const fccLink = card.match(/href=["'](https?:\\/\\/publicfiles\\.fcc\\.gov\\/[^"']+)["']/i)?.[1] || '';
     return {
       call: title,
