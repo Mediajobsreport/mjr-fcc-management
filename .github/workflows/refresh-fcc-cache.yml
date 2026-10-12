@@ -3,11 +3,6 @@ on:
   schedule:
     - cron: '30 6 * * *'
   workflow_dispatch:
-  push:
-    branches: [main]
-    paths:
-      - 'scripts/fetch_fcc_lms.mjs'
-      - '.github/workflows/refresh-fcc-cache.yml'
 jobs:
   refresh:
     runs-on: ubuntu-latest
