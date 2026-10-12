@@ -53,7 +53,7 @@
     </section>
 
     <section class="panel" id="calendar" role="tabpanel" aria-labelledby="tab-calendar" hidden>
-      <div class="section-head blue-header" style="margin-top:0"><div><h2>Deadlines &amp; calendar</h2><p>Show only obligations verified for a station or a clearly labeled general rule.</p></div><span class="pill gray">No station selected</span></div>
+      <div class="section-head blue-header" style="margin-top:0"><div><h2>Deadlines &amp; calendar</h2><p>Show only obligations verified for a station or a clearly labeled general rule.</p></div><span class="pill gray" id="calendar-status">No station selected</span></div>
       <div class="callout" id="calendar-callout"><b>Profile needed for personalized dates.</b> A general calendar can explain recurring rules. Station-specific dates require a verified station, state, renewal cycle, and any relevant employment-unit details. Unknown applicability stays marked for review.</div>
       <article class="card" id="personalized-calendar" style="margin-top:14px" hidden><div class="eyebrow">Calculated reminders · verify before acting</div><div id="personalized-items"></div><div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:10px"><button class="save-button" id="download-ics" type="button">Download calendar file</button><span class="form-note" style="align-self:center">Includes only dates calculated from the saved profile.</span></div></article>
       <article class="card" style="margin-top:14px"><div class="eyebrow">Recurring rule · commercial broadcast</div><div class="obligation"><div><b>Quarterly Issues/Programs List</b><small>Due on the 10th day of the next calendar quarter. The list describes significant community issues and programs, including program title, date, time, and duration.</small><details><summary>Who this applies to and rule source</summary><p>47 CFR § 73.3526 identifies the quarterly list for commercial AM/FM and commercial TV/Class A stations. Confirm station service and license type before treating this as a station-specific obligation.</p><a href="https://www.ecfr.gov/current/title-47/section-73.3526" target="_blank" rel="noreferrer">Read current rule § 73.3526</a></details></div><span class="pill">Rule due date</span></div></article>
@@ -98,6 +98,7 @@
     const personalized=document.getElementById('personalized-calendar');
     const personalizedItems=document.getElementById('personalized-items');
     const calendarCallout=document.getElementById('calendar-callout');
+    const calendarStatus=document.getElementById('calendar-status');
     let reminders=[];
 
     function readProfile(){return Object.fromEntries(ids.map(id=>[id,field(id).value]));}
@@ -121,6 +122,7 @@
       const complete=p.service&&p.license;
       const hasSaved=Boolean(localStorage.getItem('mjr-fcc-profile'));
       if(profileStatus){profileStatus.textContent=hasSaved?'Saved':'Not saved';profileStatus.className=hasSaved?'pill':'pill gray';}
+      if(calendarStatus){calendarStatus.textContent=hasSaved&&p['call-sign']?`${p['call-sign']} saved`:'No station selected';calendarStatus.className=hasSaved&&p['call-sign']?'pill':'pill gray';}
       reminders=[];
       if(complete && p.license==='Commercial' && ['AM','FM','TV / Class A'].includes(p.service)) reminders.push({title:'Quarterly Issues/Programs List',date:nextQuarterDue(new Date()),note:'Calculated from the FCC rule requiring the list by the 10th day after each quarter ends.',source:'https://www.ecfr.gov/current/title-47/section-73.3526'});
       if(complete && p.renewal && Number(p.employees)>=5) reminders.push({title:'Annual EEO public-file report',date:nextRenewal(p.renewal),note:'Calculated from the saved renewal due date for a covered employment unit of five or more full-time employees.',source:'https://www.ecfr.gov/current/title-47/section-73.2080'});
