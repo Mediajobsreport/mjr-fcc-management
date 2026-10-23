@@ -1,3 +1,5 @@
+import { fccService, serviceMatches } from './fcc_service.js';
+
 const CACHE_PREFIX = 'fcc:transactions:';
 const JSON_HEADERS = { 'Cache-Control': 'public, max-age=900', 'Access-Control-Allow-Origin': '*' };
 const STATION_SEARCH_URL = 'https://www.mediajobsreport.com/station-search';
@@ -26,10 +28,7 @@ function transactionMatches(row, query) {
 }
 
 function looksLikeRadio(row) {
-  const service = String(row.service || '').toLowerCase();
-  if (/am|fm|radio|translator|lpfm|booster|^fx$|^fb$/.test(service)) return true;
-  const call = String(row.call || '').toUpperCase();
-  return Boolean(call) && !/-D?TV$|-D?T$|-CDT$|-EDT$|-TT[VA]?$|-TV[LA]?$|-DTA$/.test(call);
+  return serviceMatches(row, 'radio');
 }
 
 async function readCache(env, service) {
@@ -39,9 +38,17 @@ async function readCache(env, service) {
 
 async function buildResponse(env, service, query) {
   let cached = await readCache(env, service);
+  // Repair previously mispartitioned caches immediately, before the next import.
+  // Read one authoritative combined cache rather than merging large datasets.
+  if (service !== 'all' && (!cached || !Array.isArray(cached.data) ||
+      cached.data.some(row => !serviceMatches(row, service)))) {
+    const combined = await readCache(env, 'all');
+    if (combined && Array.isArray(combined.data)) cached = combined;
+  }
   if (!cached || !Array.isArray(cached.data)) return null;
 
-  let data = cached.data;
+  let data = cached.data.filter(row => serviceMatches(row, service))
+    .map(row => ({ ...row, service: fccService(row) || row.service || '' }));
   if (query) {
     data = data.filter(row => transactionMatches(row, query));
   } else {
@@ -224,3 +231,4 @@ export default {
     }, { status: 503, headers: JSON_HEADERS });
   }
 };
+

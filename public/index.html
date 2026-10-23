@@ -140,8 +140,28 @@
     function dateScore(value){const text=String(value??'').trim();if(!text||/1900/.test(text))return 0;const time=Date.parse(text);return Number.isNaN(time)?0:time;}
     let importedRows=[], importedSource='', transactionLimit=5, transactionSearchCall='';
     function transactionMatches(row,query){if(!query)return true;return [row.call,row.seller,row.buyer,row.parties,row.licensee,row.applicant,row.assignee,row.assignor,row.file].some(value=>String(value??'').toLowerCase().includes(query));}
-    function serviceMatches(row,filter){const s=(row.service||'').toLowerCase();if(filter==='all')return true;if(filter==='television')return /tv|television|class ?a|lptv|dtv|^ttv$|^dts?$|^tx$|^t$/.test(s);if(/am|fm|radio|translator|lpfm|booster|^fx$|^fb$/.test(s))return true;const call=String(row.call||'').toUpperCase();return Boolean(call)&&!/-D?TV$|-D?T$|-CDT$|-EDT$|-TT[VA]?$|-TV[LA]?$|-DTA$/.test(call);}
-    function serviceLabel(row){const s=(row.service||'').toLowerCase(),call=String(row.call||'').toUpperCase();return /tv|television|class ?a|lptv|dtv|^ttv$|^dts?$|^tx$|^t$/.test(s)||/-D?TV$|-D?T$|-CDT$|-EDT$|-TT[VA]?$|-TV[LA]?$|-DTA$/.test(call)?'TV':'RADIO';}
+// Classify FCC services consistently in both the importer and the public API.
+// A TV translator call sign is not evidence of a radio translator service.
+function fccService(row = {}) {
+  const call = String(row.call || '').trim().toUpperCase();
+  const raw = String(row.service || '').trim().toUpperCase();
+  const code = raw.replace(/[\s_.-]/g, '');
+  if (/^[KW]\d{2}[A-Z]{2}(?:-D)?$/.test(call) ||
+      /-(?:TV|DT|DTV|CD|LD|DCA|DTA|TVA|TVL|TT|TTV|TTA|CDT|EDT)$/.test(call)) return 'television';
+  if (new Set(['TV', 'DT', 'DTV', 'DTS', 'DS', 'DC', 'DCA', 'CA', 'CD', 'LD', 'LPD', 'LPT', 'LPTV', 'TX', 'T', 'TT', 'TTV', 'TTA', 'TB', 'DRT']).has(code) ||
+      /TELEVISION|\bTV\b/.test(raw)) return 'television';
+  if (new Set(['AM', 'FM', 'FX', 'FL', 'FB', 'LPFM']).has(code) ||
+      /\bRADIO\b|\b(?:AM|FM|LPFM)\b/.test(raw)) return 'radio';
+  if (/^[KW]\d{3}[A-Z]{2}$/.test(call) || /-(?:AM|FM|FM\d+)$/.test(call) ||
+      /^[KW][A-Z]{2,3}$/.test(call)) return 'radio';
+  return '';
+}
+
+function serviceMatches(row, service) {
+  return service === 'all' || fccService(row) === service;
+}
+
+    function serviceLabel(row){const service=fccService(row);return service==='television'?'TV':service==='radio'?'RADIO':'UNCLASSIFIED';}
     function renderImported(records,name){importedRows=records;importedSource=name;transactionLimit=5;renderImportedView();}
     function renderImportedView(){const filter=document.getElementById('view-service').value,call=transactionSearchCall.toLowerCase(),box=document.getElementById('imported-transactions'),msg=document.getElementById('import-message');if(!importedRows.length){msg.textContent=importedSource?(transactionSearchCall?'No FCC transactions matched that call sign or name. Try another search or clear it.':'No transactions were found in the last two years for this service.'):'Loading FCC transactions…';box.innerHTML='';return;}const records=importedRows.filter(r=>serviceMatches(r,filter)&&(!call||transactionMatches(r,call))).sort((a,b)=>(dateScore(b.filed)||dateScore(b.statusDate))-(dateScore(a.filed)||dateScore(a.statusDate)));const visible=records.slice(0,transactionLimit);msg.textContent=transactionSearchCall?`Showing ${visible.length} of ${records.length} matching rows from the full FCC cache.`:`Showing the newest ${visible.length} of ${records.length} transactions filed within the past two years.`;if(!records.length){msg.textContent=transactionSearchCall?'No FCC transactions matched that call sign. Try another call sign or clear the search.':'No transactions match this service.';box.innerHTML='<div class="callout" style="margin-top:12px">No matching FCC transactions were found.</div>';return;}box.innerHTML='<div class="eyebrow" style="margin-top:14px">FCC transaction rows · live results</div>'+visible.map(r=>{const station=r.call||'Station not identified',serviceLabelText=serviceLabel(r),place=[r.city,r.state].filter(Boolean).join(', ')||'Location not identified';const parties=[r.seller&&r.buyer?[r.seller,r.buyer].join(' → '):'',r.parties?`FCC parties: ${r.parties}`: ''].filter(Boolean).join(' · ')||'Parties not listed in the cache';return `<div class="transaction"><div><div class="station">${safe(station)} <span class="service-pill ${serviceLabelText.toLowerCase()}">${serviceLabelText}</span></div><div class="place">${safe(place)}</div></div><div class="parties">${safe(parties)}</div><div class="stage"><span class="pill gray">${safe(r.status||'Status not listed')}</span><small>${safe(r.statusDate||r.filed||'Date not listed')}</small></div><details><summary>View FCC details</summary><div class="detail-grid"><div class="detail-item"><b>Transaction</b><span>${safe(r.type||'Not listed')}</span></div><div class="detail-item"><b>FCC file</b><span>${safe(r.file||'Not listed')}</span></div><div class="detail-item"><b>Filed</b><span>${safe(r.filed||'Not listed')}</span></div></div><p class="source-note"><a href="https://enterpriseefiling.fcc.gov/dataentry/public/tv/publicAppSearch.html" target="_blank" rel="noreferrer">Open FCC LMS search</a> · In the FCC file number field, enter FCC file <strong>${safe(r.file||"number shown above")}</strong>, then click Search. Confirm the record against the official FCC filing before acting.</p></details></div>`;}).join('')+(records.length>transactionLimit?'<div class="transaction-footer"><button class="save-button" id="show-more-transactions" type="button">Show more transactions</button></div>':'');if(records.length>transactionLimit)document.getElementById('show-more-transactions').addEventListener('click',()=>{transactionLimit+=5;renderImportedView();});}
     document.getElementById('view-service').addEventListener('change',()=>loadLive(transactionPage?transactionSearchCall:undefined));
@@ -155,3 +175,4 @@
   </script>
 </body>
 </html>
+

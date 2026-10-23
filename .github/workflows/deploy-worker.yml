@@ -4,6 +4,7 @@ on:
     branches: [main]
     paths:
       - 'fcc_transactions_worker.js'
+      - 'fcc_service.js'
       - 'package.json'
       - 'wrangler.toml'
       - 'index.html'
@@ -23,3 +24,4 @@ jobs:
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+
